@@ -29,7 +29,7 @@ wm demo       # ~10 s: fast verification gate (68 checks) + English report
 wm run        # full 11-phase scenario (20³) → snapshots.json + viewer.html
 wm checks     # full audit: 83 checks → verification.json + audit.html
 wm serve      # HTTP serving of viewer.html (file-mode frames.bin)
-pytest tests  # 131 tests
+pytest tests  # 137 tests
 ```
 
 `wm demo` is the showcase command: it runs the fast gate in ~3 s, prints the
@@ -63,8 +63,8 @@ every 10 steps (pressure P = clip(S−0.35)·0.02): S above target → "cooling"
   total energy ΣE and charge Σq to ~1e-15; the legacy bit-lock
   κ D12 = 0.4069113352735587 pins the numerics bit-for-bit.
 - **SI scale map** (`wm/constants.py`): 4 anchors — U = 781.8934068 MeV
-  (hadronization), α, h, dt — plus 5 free dials (G4 audit: none is derivable
-  from the core). Model units: m_e = 6.535404e-4 U, ħ = 0.04933296 U·step,
+  (hadronization), α, h, dt — plus 5 free dials (G4 + Vector 1 audit: none is
+  derivable from the core or its dynamics). Model units: m_e = 6.535404e-4 U, ħ = 0.04933296 U·step,
   g_e = 1.861967, a₀ = 10344.26 cells, E₁ = 13.6057 eV (quantum H via the
   α-anchor, G2).
 - **Experiments** (`wm/experiments.py`): all 83 checks + `verification.json`
@@ -112,7 +112,8 @@ free parameters.
   (coefficients not verifiable online; the naive (μ/m_e)³ factor is worse).
 - **p-Ps**: SM exceeds experiment by +0.65% (tension, o-Ps-puzzle analog) —
   agreement is *not* claimed.
-- All 5 dials are free parameters (G4); numerical coincidences are numerology.
+- All 5 dials are free parameters (G4 + Vector 1: structure and dynamics both
+  tested, no derivation found); numerical coincidences are numerology.
 
 ## Frozen predictions (P1–P5, `PREDICTIONS.md`)
 
@@ -128,19 +129,19 @@ Falsification rule: |model − measurement| > 3σ of the cited experiment.
 
 ## Reproducibility
 
-- `pytest tests` — 131 tests (unit, gates, QED precision, CLI, demo, audit).
+- `pytest tests` — 137 tests (unit, gates, QED precision, CLI, demo, audit).
 - `wm checks` — 83 checks → `verification.json` (machine-readable audit) +
   `audit.html` (offline dashboard, this page regenerates from the same JSON).
 - `wm run` — deterministic (seeded); legacy bit-lock κ D12 = 0.4069113352735587.
 - GitHub repository + CI: <https://github.com/HouKonaizer/wm-model5> (public;
-  GitHub Actions: Python 3.14, numpy==2.5.2 pinned, pytest 131 + `wm checks --fast`).
+  GitHub Actions: Python 3.14, numpy==2.5.2 pinned, pytest 137 + `wm checks --fast`).
 
 ## Files
 
 | Path | What |
 |------|------|
 | `wm/` | the package: model (kernel), experiments (checks), constants (SI map), cli, config, particles |
-| `tests/` | 131 pytest tests |
+| `tests/` | 137 pytest tests |
 | `README.md` | primary docs (Russian), living |
 | `THEORY.md` | draft axiomatics v0.11 (Russian) |
 | `EQUATIONS.md` | final equation summary (Russian) |

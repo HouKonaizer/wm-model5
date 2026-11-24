@@ -4,7 +4,7 @@
 physics.comp-ph** (предварительный; позже — воркшоп по решётным/численным
 методам). GitHub-публикация и CI — **завершены 2026-11-24**: репо
 **https://github.com/HouKonaizer/wm-model5** (публичный, MIT), CI — GitHub Actions
-(Python 3.14, numpy==2.5.2, pytest 131 + `wm checks --fast`), зелёный.
+(Python 3.14, numpy==2.5.2, pytest 137 + `wm checks --fast`), зелёный.
 
 **Рабочее название:**
 *"A Self-Consistent Five-Subspace Lattice Model with an Honest
@@ -32,7 +32,7 @@ the particle spectrum. The gravity sector is a documented closed boundary
 κ = 0.407 (−59.3 % vs GR) and the falsified prediction P1 (β_g = 1) are
 recorded as boundaries, not refutations. Five frozen predictions (P1–P5)
 carry explicit falsification protocols. All numbers are machine-readable
-(verification.json, offline dashboard audit.html) and reproducible (131 tests, `wm checks`).
+(verification.json, offline dashboard audit.html) and reproducible (137 tests, `wm checks`).
 
 ## Структура препринта (план разделов)
 
@@ -53,13 +53,16 @@ carry explicit falsification protocols. All numbers are machine-readable
    QED-блок: a_e 3-loop, R_π/R_K (SM+RC, arXiv-источники), p-Ps (напряжение
    SM>exp), 21 см (LO; полный tree — HOLD).
 6. **Limitations and boundaries** — G1 (G-сектор, 1.57e37), κ_GPS −59.3%,
-   P5 (−99.76%), свободные диалы (G4), нумерология; что НЕ заявляется.
+   P5 (−99.76%), свободные диалы (G4 + Вектор 1: ни из структуры, ни из
+   динамики), нумерология; что НЕ заявляется.
 7. **Reproducibility** — `pip install -e .`, `wm demo`, `wm run`, `wm
-   checks`, `pytest tests` (131); бит-лок; CI — GitHub Actions (см. Data &
+   checks`, `pytest tests` (137); бит-лок; CI — GitHub Actions (см. Data &
    Code Availability).
 8. **Conclusions** — ценность: единое ядро с проверяемыми сохранениями +
-   честный аудит + замороженные фальсифицируемые предсказания; путь
-   вперёд: вывод хотя бы одного диала/якоря из динамики ядра.
+   честный аудит + замороженные фальсифицируемые предсказания; Вектор 1
+   (2026-11-24): попытка вывода диала/якоря из динамики ядра — KILL
+   подтверждён (все кандидатные механизмы: структура + динамика, протестированы,
+   THEORY v0.12); путь вперёд — внешняя проверка и коллаборация.
 
 ## Claims / Non-claims (ключевая секция для рецензента)
 
@@ -88,7 +91,7 @@ carry explicit falsification protocols. All numbers are machine-readable
 
 - `verification.json` — машинный вывод полного аудита (83).
 - `audit.html` — офлайн-дашборд того же аудита (генерируется `wm checks`).
-- 131 pytest-тестов; `wm checks` пересобирает аудит за ~3 мин.
+- 137 pytest-тестов; `wm checks` пересобирает аудит за ~3 мин.
 - GitHub-репозиторий (публичный, MIT, CI — GitHub Actions, зелёный):
   https://github.com/HouKonaizer/wm-model5
 

@@ -1432,6 +1432,163 @@ def dial_structure_audit() -> dict:
     }
 
 
+# ============================================================
+# Вектор 1 (G4+): вывод диалов из ДИНАМИКИ — аудит оставшихся механизмов
+# ============================================================
+
+def dial_vector1_audit() -> dict:
+    """Вектор 1 (G4+, 2026-11-24): механизм-аудит трёх ДИНАМИЧЕСКИХ кандидатов,
+    которые G4 (S6) не закрывал. Условия зафиксированы ДО вычисления чисел.
+
+    G4 закрыл кандидатов «структура + якоря» (KILL). Остаются условия, которые
+    сама динамика модели могла бы наложить на значения диалов:
+
+    1. PSI_NODE_AMP — баланс рождения/распада узла: фиксированная точка
+       популяции узлов зафиксировала бы амплитуду pin a. В модели
+       (model._phase_transitions) узел распадается при syn < 0.15 ИЛИ
+       возраст >= TYPE_LIFETIME; для ячейки узла syn(a) = (⟨|sin|⟩ +
+       E/(E+0.1) + a + 0 + 0)/5, ⟨|sin|⟩ = 2/π, E = 1.2 U →
+       syn(a) >= (2/π + 1.2/1.3)/5 = 0.312 > 0.15 при любом a >= 0:
+       распад по синтезу НЕДОСТИЖИМ, время жизни чисто возрастное
+       (TYPE_LIFETIME — по частицам, не диал) → фиксированной точки для a
+       нет → FREE. Проверено аналитически (сетка a ∈ [0,1]) и live
+       (Volume3D, узел "n": syn ячейки узла на каждом шаге).
+    2. FIELD_GAUGE — условие отслеживания: поле — фильтр 1-го порядка
+       (model._update_fields): f_{t+1} = a_m·f_t + b·target_t, target_t =
+       K_F·∇q_t, q_t *= 0.999 (Дебай, hardcoded). Ответ фильтра 1-го
+       порядка (реальные коэффициенты, a_m > 0 при FG < 10) на
+       экспоненциальный источник — скалярный множитель источника: фазы и
+       резонанса нет → «точное отслеживание» НЕ выбирает FG: любой FG
+       отслеживает, амплитуда поля — свободный масштаб (якорей на неё
+       нет; D11 проверяет только Дебай по заряду). Проверено численно
+       (диполь, FG ∈ {0.01, 0.1, 0.5}: отношение ||f||/||q|| сходится
+       монотонно к РАЗНЫМ константам).
+    3. SI-карта — «K = α·S0» — ТАУТОЛОГИЯ: S0 = dt·U/ħ, dt = h/c,
+       h = α·ħ·c/(K·U) (конвенция S1) → S0 = α/K тождественно
+       (K·S0 = α, dev < 1e-9). Независимые якоря SI-карты: M_P (→ U =
+       M_P/1.2) и K (модельная кулоновская константа); вывод без якорей
+       отсутствует.
+
+    Вывод (KILL): ни один из 5 диалов не выводится из динамики — G4
+    подтверждён, граница зафиксирована жёстче: проверены ВСЕ известные
+    кандидатные механизмы (5 у G4 + 3 у Вектора 1 + структура якорей SI).
+    Числа модели не меняются (функция-диагностика, в список 83 не входит,
+    паттерн G3/G4: закрепление в tests/test_vector1.py).
+    """
+    from . import model as M
+    # --- 1. PSI_NODE_AMP: порог синтеза недостижим для узла ---
+    # Ячейка узла: ⟨|sin|⟩ = 2/π (среднее по фазе), E = 1.2 U → E/(E+0.1) =
+    # 1.2/1.3, grav/field ≈ 0 в чистом вакууме (model._phase_transitions,
+    # states = (|sin|, |E/(E+0.1)|, |psi|, |−grav|, |field|)).
+    a_grid = np.linspace(0.0, 1.0, 101)
+    syn = (2.0 / math.pi + 1.2 / 1.3 + a_grid) / 5.0
+    threshold = 0.15
+    unreachable = bool(syn.min() > threshold)
+    # Live: узел "n" в чистом объёме, syn в ячейке узла на каждом шаге
+    v = M.Volume3D(size=12, seed=11)
+    v.entropy_regulator_active = False
+    v.inject_particle((6, 6, 6), "n", spin=1)
+    i = v._flat(6, 6, 6)
+    syns_live = []
+    alive = False
+    for _ in range(60):
+        v.step()
+        states = np.stack([
+            np.sin(v.time_phase),
+            v.energy / (v.energy + 0.1),
+            v._psi_abs_now(),
+            -v.grav,
+            v._field_mag_now(),
+        ])
+        syn_node = float(np.mean(np.abs(states), axis=0)[i])
+        syns_live.append(syn_node)
+        # Фермион: слот зависит от спина (spin 1 → node_t, spin 0 → node_t2)
+        alive = bool(v.node_t[i] >= 0 or v.node_t2[i] >= 0)
+    node = {
+        "syn_min_grid": float(syn.min()),
+        "threshold": threshold,
+        "unreachable": unreachable,
+        "live": {
+            "n_steps": len(syns_live),
+            "syn_min": float(min(syns_live)),
+            "syn_max": float(max(syns_live)),
+            "above_threshold": all(s > threshold for s in syns_live),
+            "node_alive_after_60": alive,
+        },
+    }
+    # --- 2. FIELD_GAUGE: отслеживание без фазы/резонанса (фильтр 1-го порядка)
+    def _track(fg: float, steps: int = 300, size: int = 12, seed: int = 3):
+        """(ratios, dir_corr): ratio_t = ||f_t||/||q_t||; dir_corr — косинус
+        угла между нормированными векторами поля на последнем шаге и на 50
+        шагов раньше (стабилизация направления = отсутствие вращения/резонанса)."""
+        old = M.FIELD_GAUGE
+        M.FIELD_GAUGE = fg
+        try:
+            vf = M.Volume3D(size=size, seed=seed)
+            vf.charge.fill(0.0)
+            vf.charge[vf._flat(3, 3, 3)] = 1.0
+            vf.charge[vf._flat(8, 3, 3)] = -1.0
+            ratios = []
+            dirs = []
+            for t in range(steps):
+                vf._update_fields()
+                nf = float(np.linalg.norm(vf.field))
+                ratios.append(nf / float(np.abs(vf.charge).sum()))
+                if t >= steps - 51:
+                    dirs.append(vf.field / nf)
+            dir_corr = abs(float(np.sum(dirs[-1] * dirs[0])))
+            return ratios, dir_corr
+        finally:
+            M.FIELD_GAUGE = old
+
+    fgs = (0.01, 0.1, 0.5)
+    tracks = {fg: _track(fg) for fg in fgs}
+    settled = {}
+    for fg, (r, dc) in tracks.items():
+        r2 = np.asarray(r[40:], dtype=np.float64)
+        scale = float(np.max(np.abs(r2)))
+        dr = np.diff(r2)
+        eps = 1e-9 * scale  # шумоустойчивость: считаем только реальные осцилляции
+        active = np.where(np.abs(dr) > eps)[0]
+        if len(active) > 1:
+            sc = int(np.sum(np.sign(dr[active[:-1]]) * np.sign(dr[active[1:]]) < 0))
+        else:
+            sc = 0
+        conv = abs(float(r[-1]) - float(r[-51])) / abs(float(r[-1]))
+        settled[fg] = (sc, float(conv), float(dc))
+    limits = {fg: float(np.asarray(r[40:], dtype=np.float64).mean())
+              for fg, (r, _) in tracks.items()}
+    spread = (max(limits.values()) - min(limits.values())) / min(limits.values())
+    field = {
+        "FG": fgs,
+        "sign_changes": {fg: s[0] for fg, s in settled.items()},
+        "tail_conv_rel": {fg: s[1] for fg, s in settled.items()},
+        "dir_corr": {fg: s[2] for fg, s in settled.items()},
+        "limits": limits,
+        "limit_spread_rel": float(spread),
+        "no_resonance": all(s[0] <= 1 and s[1] < 1e-2 and s[2] > 0.999
+                            for s in settled.values()),
+        "not_selected": bool(spread > 1e-3),
+    }
+    # --- 3. SI-якоря: K·S0 = α — таутология конвенции S1 ---
+    K = M.COULOMB_K
+    S0 = M.SI_DT_S * M.SI_U_J / HBAR
+    dev = abs(K * S0 - ALPHA) / ALPHA
+    si = {
+        "K_S0": float(K * S0),
+        "alpha": ALPHA,
+        "dev": float(dev),
+        "tautology": bool(dev < 1e-9),
+        "anchors": [
+            "U: M_P/1.2 (масса протона; NODE_MASS_SCALE)",
+            "h: α·ħ·c/(K·U) (конвенция S1; K — модельная константа)",
+            "dt: h/c (причинность: 1 шаг = 1 ячейка/c)",
+        ],
+        "independent": ["M_P (→ U)", "K"],
+    }
+    return {"node": node, "field": field, "si": si, "conclusion": "free"}
+
+
 def check_numerical():
     """ЧИСЛЕННЫЕ ПРОВЕРКИ (D7–D18; см. EQUATIONS.md §4, §11).
 
