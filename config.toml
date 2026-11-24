@@ -1,0 +1,11 @@
+# WM: конфигурация по умолчанию (Option 5).
+# Приоритет: явные аргументы CLI > этот файл > встроенные DEFAULTS.
+
+[run]
+size = 20          # размер сетки N³ (целое ≥ 4)
+seed = 42          # сид RNG (целое)
+output_dir = "."   # каталог для snapshots.json / viewer.html
+write_viewer = true
+
+[checks]
+output_dir = "."   # каталог для verification.json
