@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      # numpy зафиксирован на версии разработки: бит-лок κ D12
+      # (0.4069113352735587) чувствителен к смене численной среды.
+      - name: Install
+        run: pip install -e . "numpy==2.5.2"
+
+      - name: Tests (131)
+        run: python -X utf8 -m pytest tests -q
+
+      # Fast-гейт аудита (~3 с): 68 проверок → verification.json + audit.html
+      - name: Fast audit gate
+        run: python -X utf8 -m wm checks --fast

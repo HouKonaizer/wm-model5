@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# крупные генерируемые артефакты
+snapshots.json
+viewer.html
+audit.html
+frames.bin
+wm1.json
+ses_*.json
+
+# логи и рабочие заметки
+_run*.log
+_g5_*.log
+run_log.txt
+demo_out/
+_demo_out/
+.scratchpad.md
