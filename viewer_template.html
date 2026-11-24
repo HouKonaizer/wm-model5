@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Модель 5 субпространств — 3D</title>
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#0a0c10; color:#cfd8e3;
+               font-family:"Segoe UI", Arial, sans-serif; overflow:hidden; }
+  #app { display:flex; height:100%; }
+  #panel { width:320px; min-width:320px; box-sizing:border-box; padding:14px; overflow-y:auto;
+           background:#10141b; border-right:1px solid #232a35; }
+  #canvas-wrap { flex:1; position:relative; }
+  canvas { display:block; width:100%; height:100%; }
+  h1 { font-size:15px; margin:0 0 4px; color:#e8eef7; letter-spacing:.3px; }
+  .sub { font-size:11px; color:#7d8899; margin-bottom:12px; }
+  fieldset { border:1px solid #232a35; border-radius:6px; margin:0 0 12px; padding:8px 10px; }
+  legend { font-size:11px; color:#8fa0b8; padding:0 6px; text-transform:uppercase; letter-spacing:.5px; }
+  label.row { display:flex; align-items:center; gap:8px; font-size:12px; margin:6px 0; cursor:pointer; }
+  input[type=range] { flex:1; }
+  button { background:#1b2230; color:#cfd8e3; border:1px solid #2c3648; border-radius:5px;
+           padding:4px 12px; cursor:pointer; font-size:12px; }
+  button:hover { background:#243049; }
+  button.active { background:#2b6cb0; border-color:#3b82c4; color:#fff; }
+  .layers { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+  .layers button { font-size:11px; padding:4px 9px; }
+  #frameinfo { font-size:12px; color:#9fb0c8; margin:4px 0 8px; min-height:16px; }
+  .metrics { font-size:12px; line-height:1.7; }
+  .metrics b { color:#e8eef7; font-weight:600; }
+  table { width:100%; border-collapse:collapse; font-size:11px; }
+  th { color:#7d8899; text-align:left; font-weight:500; padding:2px 4px; border-bottom:1px solid #232a35; }
+  td { padding:2px 4px; border-bottom:1px solid #1a2029; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  #legend { margin-top:10px; }
+  #grad { height:10px; border-radius:3px; width:100%; }
+  #gradlabels { display:flex; justify-content:space-between; font-size:10px; color:#7d8899; margin-top:3px; }
+  #layerdesc { font-size:11px; color:#8fa0b8; margin-top:6px; line-height:1.45; }
+  #modestats { font-size:11px; color:#8fa0b8; margin-top:4px; font-variant-numeric:tabular-nums; }
+  .hint { font-size:10.5px; color:#5c6779; margin-top:14px; line-height:1.5; }
+  #warn { display:none; position:absolute; inset:0; background:#1a0f0f; color:#ff9d9d;
+          font-size:14px; padding:30px; text-align:center; }
+  .ok { color:#7ed9a2; } .off { color:#8a93a3; }
+  .dec { font-size:10px; opacity:0.9; line-height:1.5; }
+  .dec .dt { color:#7fb3ff; }
+  .dec .brk { color:#ff7755; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="panel">
+    <h1>ЦИФРОВАЯ МОДЕЛЬ 5 СУБПРОСТРАНСТВ</h1>
+    <div class="sub">ВРЕМЯ · ЭНЕРГИЯ · ВЕРОЯТНОСТЬ · ГРАВИТАЦИЯ · ПОЛЯ<br>+ энтропийный регулятор + динамика частиц (спин, Pauli, распады, струны)</div>
+
+    <fieldset>
+      <legend>Кадр (эволюция)</legend>
+      <div id="frameinfo">—</div>
+      <label class="row">
+        <input type="range" id="frameSlider" min="0" value="0" step="1">
+        <button id="playBtn" title="Воспроизвести эволюцию">▶</button>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Субпространство (окраска)</legend>
+      <div class="layers" id="layerBtns"></div>
+      <div id="layerdesc"></div>
+      <div id="legend">
+        <div id="grad"></div>
+        <div id="gradlabels"><span id="gmin">0</span><span id="gmax">1</span></div>
+      </div>
+      <div id="modestats"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Режим</legend>
+      <label class="row">
+        <span style="width:96px">Отображение</span>
+        <select id="modeSel" style="flex:1;background:#1b2230;color:#cfd8e3;border:1px solid #2c3648;border-radius:4px">
+          <option value="value" selected>Значение</option>
+          <option value="delta">Δ к пред. кадру</option>
+        </select>
+      </label>
+      <label class="row">
+        <span style="width:96px">Цветовая шкала</span>
+        <select id="scaleSel" style="flex:1;background:#1b2230;color:#cfd8e3;border:1px solid #2c3648;border-radius:4px">
+          <option value="linear" selected>Линейная</option>
+          <option value="sqrt">Квадратный корень</option>
+          <option value="log">Логарифм</option>
+        </select>
+      </label>
+      <label class="row">
+        <span style="width:96px"></span>
+        <button id="saveFrameBtn" title="Скачать текущий кадр как JSON-файл">💾 Сохранить кадр (JSON)</button>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Срез объёма</legend>
+      <label class="row">
+        <input type="checkbox" id="sliceChk" checked>
+        Включить срез
+      </label>
+      <label class="row">
+        <span style="width:70px">Ось</span>
+        <select id="sliceAxis" style="flex:1;background:#1b2230;color:#cfd8e3;border:1px solid #2c3648;border-radius:4px">
+          <option value="0">X</option><option value="1" selected>Y</option><option value="2">Z</option>
+        </select>
+      </label>
+      <label class="row">
+        <span style="width:70px">Позиция</span>
+        <input type="range" id="slicePos" min="0" value="10" step="1">
+      </label>
+      <label class="row">
+        <input type="checkbox" id="arrowsChk" checked>
+        Стрелки полей (сильные)
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Метрики</legend>
+      <div class="metrics" id="metrics"></div>
+      <div class="metrics" id="timeline"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Слои (статистика)</legend>
+      <table>
+        <thead><tr><th>Слой</th><th style="text-align:right">мин</th><th style="text-align:right">ср.</th><th style="text-align:right">σ</th><th style="text-align:right">макс</th></tr></thead>
+        <tbody id="layerRows"></tbody>
+      </table>
+    </fieldset>
+
+    <div class="hint">
+      Режим «Δ к пред. кадру» — изменение слоя относительно предыдущего кадра (у первого кадра Δ=0).<br>
+      ЛКМ — вращение · колесо — зум · ПКМ — панорама<br>
+      ★ узлы материи: точные (суб-ячеечные координаты), цвет по типу;<br>
+      красные линии — кварковые струны. Фон может быть даунсемплирован (D³) —<br>
+      узлы и струны отображаются в полном разрешении. Торе: границы замкнуты.
+    </div>
+  </div>
+  <div id="canvas-wrap">
+    <canvas id="c"></canvas>
+    <div id="warn"></div>
+  </div>
+</div>
+
+<script src="three.min.js"></script>
+<script>
+"use strict";
+const DATA = /*__DATA__*/null;
+
+if (!DATA || !window.THREE) {
+  const w = document.getElementById('warn');
+  w.style.display = 'block';
+  w.textContent = (window.THREE ? 'Нет данных (snapshots не встроены)' : 'Не найден three.min.js — положите файл рядом с viewer.html');
+  throw new Error('init failed');
+}
+
+// ------------------------------------------------------------
+// Данные: S — полное разрешение сетки; D — разрешение фона (даунсемпл);
+// узлы/струны — всегда в полном разрешении S (масштаб K = D/S).
+// ------------------------------------------------------------
+const S = DATA.size;
+const D = DATA.bg || S;
+const ND = D * D * D;
+const K = D / S;
+const LAYERS = DATA.layers;                 // 5 названий
+const ALL_LAYERS = LAYERS.concat(['МАТЕРИЯ']);
+const LAYER_KEY = {
+  'ВРЕМЯ': 'time_rate', 'ЭНЕРГИЯ': 'energy', 'ВЕРОЯТНОСТЬ': 'psi_abs',
+  'ГРАВИТАЦИЯ': 'grav', 'ПОЛЯ': 'field_mag', 'МАТЕРИЯ': 'matter'
+};
+const DESC = {
+  'ВРЕМЯ': 'L0 · локальная скорость течения времени (дилатация ОТО+СТО). Синее — быстрое время, голубое — замедленное (у гравитационной ямы).',
+  'ЭНЕРГИЯ': 'L1 · плотность энергии. Консервативна (Нётер), нижняя граница = нулевая энергия вакуума.',
+  'ВЕРОЯТНОСТЬ': 'L2 · амплитуда |ψ| волновой функции. Суперпозиция + нелокальные корреляции (Белл).',
+  'ГРАВИТАЦИЯ': 'L3 · гравитационный потенциал (глубина ямы, 0 → −1). Создаётся плотностью энергии (ЛЛIGO/GPS).',
+  'ПОЛЯ': 'L4 · сила вектора поля |E|. Дипольность, релаксация к градиенту заряда, волновое распространение.',
+  'МАТЕРИЯ': 'Узлы синтеза: ячейки, где все 5 слоёв «в фазе». Белые точки — материя, остальное — вакуум (раслоение).'
+};
+
+// Бинарный фон: base64 (один файл) либо fetch frames.bin (wm serve)
+let BUF = null;
+const FRAME_VIEWS = {};
+function frameViews(i) {
+  const f = DATA.frames[i];
+  if (f.light || !f.bin || !BUF) return null;
+  if (FRAME_VIEWS[i]) return FRAME_VIEWS[i];
+  const v = {};
+  let p = f.bin[0];
+  const F32 = n => { const a = new Float32Array(BUF, p, n); p += n * 4; return a; };
+  const U8 = n => { const a = new Uint8Array(BUF, p, n); p += n; return a; };
+  for (const name of ['time_phase', 'time_rate', 'energy', 'psi_abs',
+                      'psi_phase', 'grav', 'field_mag', 'fx', 'fy', 'fz']) {
+    v[name] = F32(ND);
+  }
+  v.matter = U8(ND); v.spin = U8(ND); v.stack = U8(ND);
+  FRAME_VIEWS[i] = v;
+  return v;
+}
+
+function boot() {
+// ------------------------------------------------------------
+// Three.js: сцена (всё в координатах фона D)
+// ------------------------------------------------------------
+const canvas = document.getElementById('c');
+const wrap = document.getElementById('canvas-wrap');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.localClippingEnabled = true;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0c10);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100000);
+
+// позиции клеток фона (центрированные, D³)
+const pos = new Float32Array(ND * 3);
+{
+  let i = 0;
+  for (let x = 0; x < D; x++) for (let y = 0; y < D; y++) for (let z = 0; z < D; z++) {
+    pos[i++] = x - D / 2 + 0.5;
+    pos[i++] = y - D / 2 + 0.5;
+    pos[i++] = z - D / 2 + 0.5;
+  }
+}
+
+// облако клеток: ShaderMaterial — окраска на GPU (без per-frame JS-цикла)
+const cellGeo = new THREE.BufferGeometry();
+const posAttr = new THREE.BufferAttribute(pos, 3);
+cellGeo.setAttribute('position', posAttr);
+const ZERO_VIEW = new Float32Array(ND);   // тёмные кадры / запасное
+const aValAttr = new THREE.BufferAttribute(new Float32Array(ND), 1);
+const aPrevAttr = new THREE.BufferAttribute(new Float32Array(ND), 1);
+aValAttr.dynamic = true; aPrevAttr.dynamic = true;
+cellGeo.setAttribute('aVal', aValAttr);
+cellGeo.setAttribute('aPrev', aPrevAttr);
+
+const cellMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uSize: { value: 0.62 },
+    uScale: { value: 1 },
+    uMin: { value: 0 }, uMax: { value: 1 },
+    uDelta: { value: 0 },
+    uScaleMode: { value: 0 },
+    uMode: { value: 0 },
+    uStopA: { value: new THREE.Vector3(1, 1, 1) },
+    uStopB: { value: new THREE.Vector3(1, 1, 1) },
+    uStopC: { value: new THREE.Vector3(1, 1, 1) },
+    uClipAxis: { value: 1 }, uClipC: { value: 1e5 }, uClipOn: { value: 1 },
+  },
+  vertexShader: [
+    'attribute float aVal;',
+    'attribute float aPrev;',
+    'uniform float uSize, uScale, uMin, uMax, uDelta, uScaleMode, uMode;',
+    'uniform vec3 uStopA, uStopB, uStopC;',
+    'uniform float uClipAxis, uClipC, uClipOn;',
+    'varying vec3 vColor;',
+    'varying float vClip;',
+    'void main() {',
+    '  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);',
+    '  gl_Position = projectionMatrix * mvPosition;',
+    '  gl_PointSize = uSize * (uScale / max(0.001, -mvPosition.z));',
+    '  float x = mix(aVal, aVal - aPrev, uDelta);',
+    '  float t = clamp((x - uMin) / max(1e-12, uMax - uMin), 0.0, 1.0);',
+    '  if (uScaleMode > 1.5) t = clamp(log(1.0 + 99.0 * t) / 4.605170185988091, 0.0, 1.0);',
+    '  else if (uScaleMode > 0.5) t = sqrt(t);',
+    '  vec3 col;',
+    '  if (uMode > 1.5) {',
+    '    col = vec3(0.05, 0.06, 0.09);',
+    '  } else if (uMode > 0.5) {',
+    '    col = mix(vec3(0.13, 0.15, 0.18), vec3(1.0), x);',
+    '  } else if (t < 0.5) {',
+    '    col = mix(uStopA, uStopB, t * 2.0);',
+    '  } else {',
+    '    col = mix(uStopB, uStopC, (t - 0.5) * 2.0);',
+    '  }',
+    '  vColor = col;',
+    '  float pa = position.x;',
+    '  if (uClipAxis > 1.5) pa = position.z;',
+    '  else if (uClipAxis > 0.5) pa = position.y;',
+    '  vClip = (uClipOn < 0.5 || pa <= uClipC + 1e-6) ? 1.0 : 0.0;',
+    '}'
+  ].join('\n'),
+  fragmentShader: [
+    'precision mediump float;',
+    'varying vec3 vColor;',
+    'varying float vClip;',
+    'void main() {',
+    '  if (vClip < 0.5) discard;',
+    '  vec2 c = gl_PointCoord - 0.5;',
+    '  if (dot(c, c) > 0.25) discard;',
+    '  gl_FragColor = vec4(vColor, 1.0);',
+    '}'
+  ].join('\n')
+});
+const cells = new THREE.Points(cellGeo, cellMat);
+scene.add(cells);
+
+// узлы (точные, суб-ячеечные координаты; цвет по типу)
+const MAX_NODES = Math.max(1024, ND);
+const matterGeo = new THREE.BufferGeometry();
+const matterPos = new Float32Array(MAX_NODES * 3);
+const matterColor = new Float32Array(MAX_NODES * 3);
+matterGeo.setAttribute('position', new THREE.BufferAttribute(matterPos, 3));
+matterGeo.setAttribute('color', new THREE.BufferAttribute(matterColor, 3));
+const matterMat = new THREE.PointsMaterial({ size: 2.4 * K, vertexColors: true });
+const matterPts = new THREE.Points(matterGeo, matterMat);
+matterPts.frustumCulled = false;
+scene.add(matterPts);
+
+// кварковые струны (конфайнмент) — красные линии
+const MAX_STRINGS = 64;
+const strGeo = new THREE.BufferGeometry();
+const strPos = new Float32Array(MAX_STRINGS * 6);
+strGeo.setAttribute('position', new THREE.BufferAttribute(strPos, 3));
+const strMat = new THREE.LineBasicMaterial({ color: 0xff5533, transparent: true, opacity: 0.9 });
+const strLines = new THREE.LineSegments(strGeo, strMat);
+strLines.frustumCulled = false;
+scene.add(strLines);
+
+// стрелки полей
+const MAX_ARROWS = 400;
+const arrowGeo = new THREE.BufferGeometry();
+const arrowPos = new Float32Array(MAX_ARROWS * 6);
+const arrowColor = new Float32Array(MAX_ARROWS * 6);
+arrowGeo.setAttribute('position', new THREE.BufferAttribute(arrowPos, 3));
+arrowGeo.setAttribute('color', new THREE.BufferAttribute(arrowColor, 3));
+const arrowMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 });
+const arrows = new THREE.LineSegments(arrowGeo, arrowMat);
+arrows.frustumCulled = false;
+scene.add(arrows);
+
+// рамка объёма
+const boxGeo = new THREE.BoxGeometry(D, D, D);
+const boxEdges = new THREE.LineSegments(
+  new THREE.EdgesGeometry(boxGeo),
+  new THREE.LineBasicMaterial({ color: 0x2c3648 })
+);
+scene.add(boxEdges);
+
+// срез (клиппинг-плоскость: встроенные материалы + uniform'ы shader'а клеток)
+const clipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), D);
+matterMat.clippingPlanes = [clipPlane];
+arrowMat.clippingPlanes = [clipPlane];
+strMat.clippingPlanes = [clipPlane];
+
+// ------------------------------------------------------------
+// Камера: собственный орбитальный контроль
+// ------------------------------------------------------------
+const orbit = { r: D * 2.6, theta: Math.PI / 4, phi: Math.PI / 3, tx: 0, ty: 0, tz: 0 };
+function updateCamera() {
+  orbit.phi = Math.max(0.05, Math.min(Math.PI - 0.05, orbit.phi));
+  orbit.r = Math.max(D * 0.5, Math.min(D * 8, orbit.r));
+  const sp = Math.sin(orbit.phi), cp = Math.cos(orbit.phi);
+  camera.position.set(
+    orbit.tx + orbit.r * sp * Math.cos(orbit.theta),
+    orbit.ty + orbit.r * cp,
+    orbit.tz + orbit.r * sp * Math.sin(orbit.theta)
+  );
+  camera.lookAt(orbit.tx, orbit.ty, orbit.tz);
+}
+let drag = null;
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('mousedown', e => {
+  drag = { btn: e.button, x: e.clientX, y: e.clientY };
+});
+window.addEventListener('mouseup', () => drag = null);
+window.addEventListener('mousemove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  drag.x = e.clientX; drag.y = e.clientY;
+  if (drag.btn === 0) {
+    orbit.theta -= dx * 0.006;
+    orbit.phi -= dy * 0.006;
+  } else if (drag.btn === 2) {
+    const k = orbit.r * 0.0012;
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+    const off = (-dx * right + dy * up).multiplyScalar(k);
+    orbit.tx += off.x; orbit.ty += off.y; orbit.tz += off.z;
+  }
+  updateCamera();
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  orbit.r *= Math.exp(e.deltaY * 0.001);
+  updateCamera();
+}, { passive: false });
+
+function resize() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  renderer.setPixelRatio(dpr);
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  cellMat.uniforms.uScale.value = renderer.domElement.height * 0.5;
+}
+window.addEventListener('resize', resize);
+
+// ------------------------------------------------------------
+// Палитры слоёв
+// ------------------------------------------------------------
+const CMAPS = {
+  'ВРЕМЯ':       [[0.03, 0.10, 0.45], [0.10, 0.45, 0.95], [0.65, 0.92, 1.00]],
+  'ЭНЕРГИЯ':     [[0.04, 0.04, 0.07], [0.85, 0.20, 0.05], [1.00, 0.92, 0.30]],
+  'ВЕРОЯТНОСТЬ': [[0.06, 0.04, 0.14], [0.52, 0.12, 0.82], [0.35, 0.95, 1.00]],
+  'ГРАВИТАЦИЯ':  [[0.10, 0.12, 0.11], [0.08, 0.55, 0.28], [0.55, 1.00, 0.40]],
+  'ПОЛЯ':        [[0.12, 0.05, 0.02], [0.95, 0.52, 0.05], [1.00, 0.80, 1.00]],
+};
+function cssGrad(stops) {
+  return 'linear-gradient(90deg,' + stops.map(s =>
+    'rgb(' + Math.round(s[0] * 255) + ',' + Math.round(s[1] * 255) + ',' + Math.round(s[2] * 255) + ')').join(',') + ')';
+}
+// дивергирующая палитра для Δ-режима: синий (−) → фон → красный (+)
+const DELTA_STOPS = [[0.25, 0.45, 0.95], [0.13, 0.15, 0.18], [0.95, 0.35, 0.25]];
+
+// scratch-буферы для matter (uint8 в бинарнике → float для shader'а)
+const MV0 = new Float32Array(ND);
+const MV1 = new Float32Array(ND);
+
+// ------------------------------------------------------------
+// Состояние UI
+// ------------------------------------------------------------
+const ui = {
+  frame: 0,
+  layer: 'ЭНЕРГИЯ',
+  sliceOn: true,
+  sliceAxis: 1,
+  slicePos: Math.floor(D / 2),
+  arrows: true,
+  mode: 'value',
+  scale: 'linear',
+  playing: false,
+};
+
+const NODE_COLORS = DATA.typeColors || [];
+const frameSlider = document.getElementById('frameSlider');
+frameSlider.max = DATA.frames.length - 1;
+const playBtn = document.getElementById('playBtn');
+const metricsEl = document.getElementById('metrics');
+const timelineEl = document.getElementById('timeline');
+const frameinfo = document.getElementById('frameinfo');
+const layerRows = document.getElementById('layerRows');
+const layerBtns = document.getElementById('layerBtns');
+const layerdesc = document.getElementById('layerdesc');
+const grad = document.getElementById('grad');
+const gmin = document.getElementById('gmin');
+const gmax = document.getElementById('gmax');
+const sliceChk = document.getElementById('sliceChk');
+const sliceAxisSel = document.getElementById('sliceAxis');
+const slicePos = document.getElementById('slicePos');
+slicePos.max = D - 1;
+const arrowsChk = document.getElementById('arrowsChk');
+const modeSel = document.getElementById('modeSel');
+const scaleSel = document.getElementById('scaleSel');
+const saveFrameBtn = document.getElementById('saveFrameBtn');
+const modestats = document.getElementById('modestats');
+
+ALL_LAYERS.forEach(name => {
+  const b = document.createElement('button');
+  b.textContent = name;
+  b.addEventListener('click', () => { ui.layer = name; refreshUI(); renderFrame(); });
+  layerBtns.appendChild(b);
+});
+
+function refreshUI() {
+  [...layerBtns.children].forEach((b, i) =>
+    b.classList.toggle('active', ALL_LAYERS[i] === ui.layer));
+  layerdesc.textContent = DESC[ui.layer] || '';
+  grad.style.background = ui.mode === 'delta' ? cssGrad(DELTA_STOPS)
+    : (ui.layer === 'МАТЕРИЯ' ? 'linear-gradient(90deg,#20242c,#ffffff)' : cssGrad(CMAPS[ui.layer]));
+  if (ui.layer === 'МАТЕРИЯ' && ui.mode !== 'delta') { gmin.textContent = 'вакуум'; gmax.textContent = 'узел'; }
+  modeSel.value = ui.mode;
+  scaleSel.value = ui.scale;
+  scaleSel.disabled = ui.mode === 'delta';
+  slicePos.value = ui.slicePos;
+  sliceChk.checked = ui.sliceOn;
+  arrowsChk.checked = ui.arrows;
+}
+
+frameSlider.addEventListener('input', () => { ui.frame = +frameSlider.value; renderFrame(); });
+playBtn.addEventListener('click', () => {
+  ui.playing = !ui.playing;
+  playBtn.textContent = ui.playing ? '⏸' : '▶';
+  if (ui.playing) {
+    ui.timer = setInterval(() => {
+      ui.frame = (ui.frame + 1) % DATA.frames.length;
+      frameSlider.value = ui.frame;
+      renderFrame();
+    }, 500);
+  } else if (ui.timer) clearInterval(ui.timer);
+});
+sliceChk.addEventListener('change', () => { ui.sliceOn = sliceChk.checked; applyClip(); });
+sliceAxisSel.addEventListener('change', () => { ui.sliceAxis = +sliceAxisSel.value; applyClip(); });
+slicePos.addEventListener('input', () => { ui.slicePos = +slicePos.value; applyClip(); });
+arrowsChk.addEventListener('change', () => { ui.arrows = arrowsChk.checked; renderFrame(); });
+modeSel.addEventListener('change', () => { ui.mode = modeSel.value; refreshUI(); renderFrame(); });
+scaleSel.addEventListener('change', () => { ui.scale = scaleSel.value; renderFrame(); });
+saveFrameBtn.addEventListener('click', saveFrame);
+
+function applyClip() {
+  const c = ui.slicePos - D / 2 + 0.5;
+  if (!ui.sliceOn) {
+    clipPlane.normal.set(0, -1, 0);
+    clipPlane.constant = 1e5;
+    cellMat.uniforms.uClipOn.value = 0;
+  } else {
+    const n = [0, 0, 0]; n[ui.sliceAxis] = -1;
+    clipPlane.normal.set(n[0], n[1], n[2]);
+    clipPlane.constant = c; // держим координату <= c вдоль оси
+    cellMat.uniforms.uClipOn.value = 1;
+    cellMat.uniforms.uClipAxis.value = ui.sliceAxis;
+    cellMat.uniforms.uClipC.value = c;
+  }
+}
+
+// ------------------------------------------------------------
+// Данные кадра
+// ------------------------------------------------------------
+function getFrameData(i) {
+  const f = DATA.frames[i];
+  return {
+    light: !!f.light,
+    t: f.t, label: f.label, metrics: f.metrics, layers: f.layers,
+    v: frameViews(i),
+    minmax: f.minmax || null,
+    nodes: (f.data && f.data.nodes) || [],
+    strings: (f.data && f.data.strings) || [],
+    decays: (f.data && f.data.decays) || [],
+  };
+}
+
+// один проход: min/max/mean/σ значения x = cur − (prev||0·cur)
+function computeStats(cur, prev) {
+  let a = Infinity, b = -Infinity, s = 0, s2 = 0;
+  for (let c = 0; c < ND; c++) {
+    const x = prev ? cur[c] - prev[c] : cur[c];
+    if (x < a) a = x;
+    if (x > b) b = x;
+    s += x; s2 += x * x;
+  }
+  if (a === b) b = a + 1e-6;
+  const mean = s / ND;
+  return { a: a, b: b, mean: mean, std: Math.sqrt(Math.max(0, s2 / ND - mean * mean)) };
+}
+
+// топ-K индексов по значению (min-heap; сортировка ND — слишком медленна)
+function topKHeap(arr, Kk) {
+  const heap = new Array(Kk);
+  let hlen = 0;
+  for (let c = 0; c < ND; c++) {
+    const val = arr[c];
+    if (hlen < Kk) {
+      heap[hlen] = [val, c];
+      let i = hlen++;
+      while (i > 0) {
+        const p = (i - 1) >> 1;
+        if (heap[i][0] < heap[p][0]) { const t = heap[i]; heap[i] = heap[p]; heap[p] = t; i = p; }
+        else break;
+      }
+    } else if (val > heap[0][0]) {
+      heap[0] = [val, c];
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1, r = l + 1;
+        let s2 = i;
+        if (l < hlen && heap[l][0] < heap[s2][0]) s2 = l;
+        if (r < hlen && heap[r][0] < heap[s2][0]) s2 = r;
+        if (s2 === i) break;
+        const t = heap[i]; heap[i] = heap[s2]; heap[s2] = t; i = s2;
+      }
+    }
+  }
+  heap.sort((a, b) => b[0] - a[0]);
+  return heap;
+}
+
+// ------------------------------------------------------------
+// Сохранение кадра (JSON)
+// ------------------------------------------------------------
+function r6(x) { return Math.round(x * 1e6) / 1e6; }
+function saveFrame() {
+  const d = frameCache;
+  if (!d) return;
+  const v = d.v;
+  const pack = a => Array.from(a, r6);
+  const data = {
+    nodes: d.nodes, strings: d.strings, decays: d.decays,
+  };
+  if (v) {
+    data.time_rate = pack(v.time_rate);
+    data.energy = pack(v.energy);
+    data.psi_abs = pack(v.psi_abs);
+    data.grav = pack(v.grav);
+    data.field_mag = pack(v.field_mag);
+    const fv = new Float32Array(3 * ND);
+    fv.set(v.fx, 0); fv.set(v.fy, ND); fv.set(v.fz, 2 * ND);
+    data.field_vec = pack(fv);
+    data.matter = Array.from(v.matter, x => x ? 1 : 0);
+    data.spin = Array.from(v.spin, x => x ? x - 1 : -1);
+    data.stack = Array.from(v.stack);
+  }
+  const obj = {
+    generator: 'wm-viewer', t: d.t, label: d.label, size: S,
+    metrics: d.metrics, layers: d.layers, data: data,
+  };
+  if (D !== S) obj.bg = D;
+  const blob = new Blob([JSON.stringify(obj)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'wm_frame_t' + d.t + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+// ------------------------------------------------------------
+// Отрисовка кадра
+// ------------------------------------------------------------
+let frameCache = null;
+
+function renderFrame() {
+  const i = ui.frame;
+  const d = getFrameData(i);
+  frameCache = d;
+  frameinfo.textContent = 't=' + d.t + ' · ' + d.label;
+  frameSlider.value = i;
+
+  const v = d.v;
+  const isMatter = ui.layer === 'МАТЕРИЯ';
+  const delta = (ui.mode === 'delta' && !d.light);
+  const key = LAYER_KEY[ui.layer];
+
+  // значение/Δ активного слоя (views из бинарника — без копий)
+  let cur = null, prev = null;
+  if (v) {
+    cur = (key === 'matter') ? (MV0.set(v.matter), MV0) : v[key];
+    if (delta && i > 0) {
+      const vp = frameViews(i - 1);
+      if (vp) prev = (key === 'matter') ? (MV1.set(vp.matter), MV1) : vp[key];
+    }
+  }
+  if (delta && !prev) prev = cur;   // первый кадр: Δ = 0 (aVal − aPrev = 0)
+
+  let mn = 0, mx = 1, stats = null;
+  if (!d.light && cur) {
+    if (isMatter && !delta) { mn = 0; mx = 1; }
+    else {
+      stats = computeStats(cur, prev);
+      if (delta) {
+        const R = Math.max(Math.abs(stats.a), Math.abs(stats.b), 1e-6);
+        mn = -R; mx = R;
+      } else { mn = stats.a; mx = stats.b; }
+    }
+  }
+
+  // uniforms + атрибуты клеток
+  const u = cellMat.uniforms;
+  u.uDelta.value = delta ? 1 : 0;
+  u.uMode.value = d.light ? 2 : (isMatter && !delta ? 1 : 0);
+  u.uScaleMode.value = ui.scale === 'sqrt' ? 1 : (ui.scale === 'log' ? 2 : 0);
+  u.uMin.value = mn; u.uMax.value = mx;
+  const stops = delta ? DELTA_STOPS : (CMAPS[ui.layer] || CMAPS['ЭНЕРГИЯ']);
+  u.uStopA.value.set(stops[0][0], stops[0][1], stops[0][2]);
+  u.uStopB.value.set(stops[1][0], stops[1][1], stops[1][2]);
+  u.uStopC.value.set(stops[2][0], stops[2][1], stops[2][2]);
+  aValAttr.array = cur || ZERO_VIEW;
+  aValAttr.needsUpdate = true;
+  aPrevAttr.array = prev || cur || ZERO_VIEW;
+  aPrevAttr.needsUpdate = true;
+
+  if (d.light) { gmin.textContent = '—'; gmax.textContent = '—'; }
+  else if (isMatter && !delta) { gmin.textContent = 'вакуум'; gmax.textContent = 'узел'; }
+  else { gmin.textContent = mn.toFixed(3); gmax.textContent = mx.toFixed(3); }
+
+  // статистика отображаемых значений (текущий режим)
+  if (d.light) {
+    modestats.textContent = 'узлов: ' + d.nodes.length;
+  } else if (!isMatter || delta) {
+    if (stats) {
+      modestats.textContent = (delta ? 'Δ: ' : '') + 'min ' + mn.toFixed(4) +
+        ' · сред ' + stats.mean.toFixed(4) + ' · σ ' + stats.std.toFixed(4) + ' · max ' + mx.toFixed(4);
+    } else {
+      modestats.textContent = '';
+    }
+  } else if (v) {
+    let cnt = 0;
+    for (let c = 0; c < ND; c++) if (v.matter[c]) cnt++;
+    modestats.textContent = 'узлов материи: ' + cnt + ' (фон ' + D + '³)';
+  } else {
+    modestats.textContent = '';
+  }
+
+  // узлы материи: точный overlay (суб-ячеечные координаты → масштаб K)
+  let m = 0;
+  const ns = d.nodes;
+  if (ns.length) {
+    m = Math.min(ns.length, MAX_NODES);
+    matterMat.size = 2.4 * K;
+    const off = -D / 2;
+    for (let k = 0; k < m; k++) {
+      const n = ns[k];
+      matterPos[k * 3] = (n[0] + 0.5) * K + off;
+      matterPos[k * 3 + 1] = (n[1] + 0.5) * K + off;
+      matterPos[k * 3 + 2] = (n[2] + 0.5) * K + off;
+      const col = NODE_COLORS[n[3]] || [1, 1, 1];
+      matterColor[k * 3] = col[0]; matterColor[k * 3 + 1] = col[1]; matterColor[k * 3 + 2] = col[2];
+    }
+  } else if (!d.light && v) {
+    // старый формат (без списка узлов): скан matter-поля фона
+    matterMat.size = 1.15;
+    for (let c = 0; c < ND && m < MAX_NODES; c++) {
+      if (!v.matter[c]) continue;
+      matterPos[m * 3] = pos[c * 3];
+      matterPos[m * 3 + 1] = pos[c * 3 + 1];
+      matterPos[m * 3 + 2] = pos[c * 3 + 2];
+      const stk = v.stack[c];
+      const spn = v.spin[c] - 1;   // 0=нет, 1=↓, 2=↑ → -1/0/1
+      let cr = 1, cg = 1, cb = 0.95;
+      if (stk >= 2) { cr = 1.0; cg = 0.8; cb = 0.4; }
+      else if (spn === 0) { cr = 0.53; cg = 0.67; cb = 1.0; }
+      matterColor[m * 3] = cr; matterColor[m * 3 + 1] = cg; matterColor[m * 3 + 2] = cb;
+      m++;
+    }
+  }
+  matterGeo.setDrawRange(0, m);
+  matterGeo.attributes.position.needsUpdate = true;
+  matterGeo.attributes.color.needsUpdate = true;
+  matterPts.visible = m > 0;
+
+  // кварковые струны (координаты полного разрешения → масштаб K)
+  const strs = d.strings;
+  const KS = Math.min(MAX_STRINGS, strs.length);
+  const off2 = -D / 2;
+  for (let k = 0; k < KS; k++) {
+    const s = strs[k];
+    const p6 = k * 6;
+    strPos[p6] = (s[0] + 0.5) * K + off2;
+    strPos[p6 + 1] = (s[1] + 0.5) * K + off2;
+    strPos[p6 + 2] = (s[2] + 0.5) * K + off2;
+    strPos[p6 + 3] = (s[3] + 0.5) * K + off2;
+    strPos[p6 + 4] = (s[4] + 0.5) * K + off2;
+    strPos[p6 + 5] = (s[5] + 0.5) * K + off2;
+  }
+  strGeo.setDrawRange(0, KS * 2);
+  strGeo.attributes.position.needsUpdate = true;
+  strLines.visible = KS > 0;
+
+  // стрелки полей (топ-K по |E|)
+  if (ui.arrows && !d.light && v) {
+    const top = topKHeap(v.field_mag, MAX_ARROWS);
+    let maxf = 1e-6;
+    for (let k = 0; k < top.length; k++) maxf = Math.max(maxf, top[k][0]);
+    for (let k = 0; k < top.length; k++) {
+      const c = top[k][1];
+      const fx = v.fx[c], fy = v.fy[c], fz = v.fz[c];
+      const fm = Math.sqrt(fx * fx + fy * fy + fz * fz) + 1e-9;
+      const len = 0.35 + 0.9 * (v.field_mag[c] / maxf);
+      const x = pos[c * 3], y = pos[c * 3 + 1], z = pos[c * 3 + 2];
+      const p6 = k * 6;
+      arrowPos[p6] = x; arrowPos[p6 + 1] = y; arrowPos[p6 + 2] = z;
+      arrowPos[p6 + 3] = x + fx / fm * len;
+      arrowPos[p6 + 4] = y + fy / fm * len;
+      arrowPos[p6 + 5] = z + fz / fm * len;
+      const t = v.field_mag[c] / maxf;
+      const cr = 0.95 + 0.05 * t, cg = 0.52 + 0.48 * t, cb = 0.05 + 0.95 * t;
+      arrowColor[p6] = cr * 0.55; arrowColor[p6 + 1] = cg * 0.55; arrowColor[p6 + 2] = cb * 0.55;
+      arrowColor[p6 + 3] = cr; arrowColor[p6 + 4] = cg; arrowColor[p6 + 5] = cb;
+    }
+    arrowGeo.setDrawRange(0, top.length * 2);
+    arrowGeo.attributes.position.needsUpdate = true;
+    arrowGeo.attributes.color.needsUpdate = true;
+    arrows.visible = true;
+  } else {
+    arrows.visible = false;
+  }
+
+  // метрики
+  const mm = d.metrics;
+  metricsEl.innerHTML =
+    'Энтропия: <b>' + mm.entropy.toFixed(4) + '</b> / цель ' + mm.target +
+    (mm.entropy > mm.target ? ' <span class="off">(↓ охлаждение)</span>' : ' <span class="off">(↑ нагрев)</span>') +
+    '<br>Давление регулятора: <b>' + mm.pressure.toFixed(4) + '</b> · ' +
+    (mm.regulator ? '<span class="ok">ВКЛ</span>' : '<span class="off">ВЫКЛ</span>') +
+    '<br>Энергия ΣE: <b>' + mm.energy.toFixed(1) + '</b><br>Узлы материи: <b>' + mm.matter + '</b>' +
+    (mm.strings !== undefined ?
+      '<br>Струны: <b>' + mm.strings + '</b> · Pauli-блоки: <b>' + mm.pauli + '</b> · событий: <b>' + mm.decays + '</b>' : '');
+
+  // таймлайн распадов/разрывов (последние 12)
+  const dec = d.decays;
+  let tl = '';
+  for (let k = Math.max(0, dec.length - 12); k < dec.length; k++) {
+    const e = dec[k];
+    const brk = e.type !== 'decay';
+    const sym = e.to ? (e.from + ' → ' + e.to) : e.from;
+    tl += '<div class="dec"><span class="dt">t=' + e.t + '</span> ' +
+          (brk ? '<span class="brk">[' + e.type + ']</span> ' : '') + sym +
+          ' @[' + e.pos.join(',') + ']</div>';
+  }
+  timelineEl.innerHTML = tl ? '<b>Распады/разрывы (последние ' + Math.min(12, dec.length) + ')</b>' + tl : '';
+
+  // таблица слоёв (мин — из min/max бинарного кадра; ср/σ/макс — метрики кадра)
+  let rows = '';
+  for (const name of LAYERS) {
+    const s = d.layers[name];
+    const mmv = d.minmax ? d.minmax[LAYER_KEY[name]] : null;
+    rows += '<tr><td>' + name + '</td><td class="num">' + (mmv ? mmv[0].toFixed(3) : '—') +
+            '</td><td class="num">' + s.mean.toFixed(3) +
+            '</td><td class="num">' + s.std.toFixed(3) + '</td><td class="num">' + s.max.toFixed(3) + '</td></tr>';
+  }
+  layerRows.innerHTML = rows;
+}
+
+// ------------------------------------------------------------
+// Цикл отрисовки
+// ------------------------------------------------------------
+function loop() {
+  requestAnimationFrame(loop);
+  renderer.render(scene, camera);
+}
+
+resize();
+updateCamera();
+applyClip();
+refreshUI();
+renderFrame();
+loop();
+}  // boot()
+
+// ------------------------------------------------------------
+// Загрузка бинарного фона и старт
+// ------------------------------------------------------------
+if (DATA.bin_b64) {
+  const bin = atob(DATA.bin_b64);
+  BUF = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) BUF[i] = bin.charCodeAt(i);
+  boot();
+} else if (DATA.bin) {
+  fetch(DATA.bin)
+    .then(r => r.ok ? r.arrayBuffer() : Promise.reject(new Error('HTTP ' + r.status)))
+    .then(ab => { BUF = new Uint8Array(ab); boot(); })
+    .catch(err => {
+      const w = document.getElementById('warn');
+      w.style.display = 'block';
+      w.textContent = 'Не удалось загрузить ' + DATA.bin + ' — запустите: wm serve --out <каталог> и откройте http://127.0.0.1:8000/viewer.html';
+      throw err;
+    });
+} else {
+  boot();
+}
+</script>
+</body>
+</html>
