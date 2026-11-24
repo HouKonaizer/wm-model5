@@ -19,7 +19,7 @@ jobs:
       # numpy зафиксирован на версии разработки: бит-лок κ D12
       # (0.4069113352735587) чувствителен к смене численной среды.
       - name: Install
-        run: pip install -e . "numpy==2.5.2"
+        run: pip install -e .[test] "numpy==2.5.2"
 
       - name: Tests (131)
         run: python -X utf8 -m pytest tests -q
