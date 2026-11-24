@@ -1,5 +1,11 @@
 # Цифровая модель 5 субпространств в 3D объёме
 
+[![CI](https://github.com/HouKonaizer/wm-model5/actions/workflows/ci.yml/badge.svg)](https://github.com/HouKonaizer/wm-model5/actions)
+[![Python](https://img.shields.io/badge/python-3.11+-3776ab?logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Код: **https://github.com/HouKonaizer/wm-model5** (публичный, CI — GitHub Actions, зелёный).
+
 **Позиционирование (честно):** самосогласованная *численная* решётчатая платформа
 с честным аудитом — что здесь калибровка, что стандартная формула, что настоящее
 предсказание. **Не** теория, выводящая α, G, m_e из первых принципов.
@@ -45,7 +51,8 @@ S > цель → «охлаждение» (порядок, синтез); S < ц
 
 ## Быстрый старт
 
-Требования: Python 3.11+, numpy.
+Требования: Python 3.11+, numpy. (CI фиксирует Python 3.14 + numpy==2.5.2 — версию
+разработки, на которой держится бит-лок κ D12.)
 
 ```
 pip install -e .        # или без установки: python -m wm ...

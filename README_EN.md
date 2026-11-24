@@ -1,5 +1,9 @@
 # WM — a Self-Consistent Five-Subspace Lattice Model
 
+[![CI](https://github.com/HouKonaizer/wm-model5/actions/workflows/ci.yml/badge.svg)](https://github.com/HouKonaizer/wm-model5/actions)
+[![Python](https://img.shields.io/badge/python-3.11+-3776ab?logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 An English entry point for external readers. The primary project documentation is
 in Russian (`README.md`, `THEORY.md`, `EQUATIONS.md`); this file mirrors the
 current state (docs date: 2026-11-23) in English.
@@ -128,7 +132,8 @@ Falsification rule: |model − measurement| > 3σ of the cited experiment.
 - `wm checks` — 83 checks → `verification.json` (machine-readable audit) +
   `audit.html` (offline dashboard, this page regenerates from the same JSON).
 - `wm run` — deterministic (seeded); legacy bit-lock κ D12 = 0.4069113352735587.
-- GitHub repository + CI: to be added (publication stage).
+- GitHub repository + CI: <https://github.com/HouKonaizer/wm-model5> (public;
+  GitHub Actions: Python 3.14, numpy==2.5.2 pinned, pytest 131 + `wm checks --fast`).
 
 ## Files
 

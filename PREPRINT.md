@@ -2,7 +2,9 @@
 
 Цель: препринт для вычислительных физиков. Целевая площадка: **arXiv
 physics.comp-ph** (предварительный; позже — воркшоп по решётным/численным
-методам). GitHub-публикация и CI — на этапе публикации (позже).
+методам). GitHub-публикация и CI — **завершены 2026-11-24**: репо
+**https://github.com/HouKonaizer/wm-model5** (публичный, MIT), CI — GitHub Actions
+(Python 3.14, numpy==2.5.2, pytest 131 + `wm checks --fast`), зелёный.
 
 **Рабочее название:**
 *"A Self-Consistent Five-Subspace Lattice Model with an Honest
@@ -53,7 +55,8 @@ carry explicit falsification protocols. All numbers are machine-readable
 6. **Limitations and boundaries** — G1 (G-сектор, 1.57e37), κ_GPS −59.3%,
    P5 (−99.76%), свободные диалы (G4), нумерология; что НЕ заявляется.
 7. **Reproducibility** — `pip install -e .`, `wm demo`, `wm run`, `wm
-   checks`, `pytest tests` (131); бит-лок; (CI — на этапе GitHub).
+   checks`, `pytest tests` (131); бит-лок; CI — GitHub Actions (см. Data &
+   Code Availability).
 8. **Conclusions** — ценность: единое ядро с проверяемыми сохранениями +
    честный аудит + замороженные фальсифицируемые предсказания; путь
    вперёд: вывод хотя бы одного диала/якоря из динамики ядра.
@@ -86,7 +89,8 @@ carry explicit falsification protocols. All numbers are machine-readable
 - `verification.json` — машинный вывод полного аудита (83).
 - `audit.html` — офлайн-дашборд того же аудита (генерируется `wm checks`).
 - 131 pytest-тестов; `wm checks` пересобирает аудит за ~3 мин.
-- GitHub-репозиторий + CI: добавляются на этапе публикации (позже).
+- GitHub-репозиторий (публичный, MIT, CI — GitHub Actions, зелёный):
+  https://github.com/HouKonaizer/wm-model5
 
 ## Язык препринта
 
